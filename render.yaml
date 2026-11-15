@@ -1,0 +1,33 @@
+# Render blueprint for www.openartvision.com .
+# In Render: New > Blueprint > pick this repo. Secrets marked sync:false are entered in the dashboard.
+services:
+  - type: web
+    name: openartvision
+    runtime: docker
+    plan: starter
+    healthCheckPath: /healthz
+    domains:
+      - www.openartvision.com
+    disk:
+      name: data
+      mountPath: /app/data
+      sizeGB: 10
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: SITE_PASSWORD
+        sync: false
+      - key: COOKIE_SECRET
+        generateValue: true
+      - key: COMFY_URL
+        value: https://comfy.openartvision.com
+      - key: CF_ACCESS_CLIENT_ID
+        sync: false
+      - key: CF_ACCESS_CLIENT_SECRET
+        sync: false
+      - key: DEFAULT_MODEL
+        value: claude-sonnet-5-5
+      - key: TITLE_MODEL
+        value: claude-haiku-5-5
+      - key: START_CREDITS
+        value: "1000"

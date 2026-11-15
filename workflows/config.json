@@ -1,0 +1,38 @@
+{
+  "_help": "Map each tool to a ComfyUI workflow exported with 'Export (API)'. Node ids must match YOUR export. Set a field to null if your workflow doesn't have it. 'video' is text-to-video (used for every Script to Film shot). 'video_i2v' is optional: add an image-to-video workflow as img2vid_api.json to let the chat agent animate an image.",
+  "image": {
+    "file": "txt2img_api.json",
+    "nodes": {
+      "prompt": ["6", "text"],
+      "negative": ["7", "text"],
+      "seed": ["3", "seed"],
+      "width": ["5", "width"],
+      "height": ["5", "height"]
+    }
+  },
+  "video": {
+    "file": "txt2vid_api.json",
+    "nodes": {
+      "prompt": ["6", "text"],
+      "seed": ["3", "seed"],
+      "width": ["55", "width"],
+      "height": ["55", "height"],
+      "frames": ["55", "length"],
+      "fps": ["57", "fps"]
+    },
+    "fps": 16
+  },
+  "video_i2v": {
+    "file": "img2vid_api.json",
+    "nodes": {
+      "prompt": ["6", "text"],
+      "seed": ["3", "seed"],
+      "width": ["55", "width"],
+      "height": ["55", "height"],
+      "frames": ["55", "length"],
+      "fps": ["57", "fps"],
+      "image": ["56", "image"]
+    },
+    "fps": 16
+  }
+}
