@@ -1,4 +1,4 @@
-# Render blueprint for www.openartvision.com .
+# Render blueprint for www.openartvision.com.
 # In Render: New > Blueprint > pick this repo. Secrets marked sync:false are entered in the dashboard.
 services:
   - type: web
