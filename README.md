@@ -1,6 +1,6 @@
-# OpenArtVision
+# 925 Cinematic Studios
 
-A web-based AI creative studio for **www.925cinema.com**, in the style of Runway. Generation runs on your own ComfyUI engine (your Mac, through a tunnel). Two ways to work:
+**925 Cinematic Studios** is a web-based AI film studio for **www.925cinema.com**, in the style of Runway. Generation runs on your own ComfyUI engine (your Mac, through a tunnel). Two ways to work:
 
 - **Script to Film:** upload a script, get one clip per shot on a timeline in script order, stitched into one film you can export.
 - **Agent chat:** describe an idea; a Claude-powered agent proposes image or video generations as approval cards.

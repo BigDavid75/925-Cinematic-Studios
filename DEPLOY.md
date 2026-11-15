@@ -11,22 +11,24 @@ visitor ──https──▶ www.925cinema.com (Render)
 
 ## Where your DNS is now
 
-`925cinema.com` currently points at your registrar's "under construction" page:
+You own `925cinema.com`, and its DNS is managed at **domains.com**, where it points at the "under construction" page:
 
 | Type | Name | Value | TTL |
 | --- | --- | --- | --- |
 | A | `@` | 208.91.197.27 | 5 min |
 | A | `www` | 208.91.197.27 | 5 min |
 
-Both records get replaced below. The 5-minute TTL means changes show up quickly.
+Both records get replaced below. The domain stays registered at domains.com; only the DNS moves to Cloudflare.
 
-## 1. Move DNS to Cloudflare (needed for the locked tunnel)
+## 1. Move DNS from domains.com to Cloudflare (needed for the locked tunnel)
 
 The tunnel and its Access lock only work for a domain whose DNS is on Cloudflare.
 
 1. Create a free account at cloudflare.com → **Add a domain** → `925cinema.com` → Free plan.
-2. Cloudflare copies your current records. **Delete both A records that point at 208.91.197.27.** Keep any MX or TXT records (email).
-3. Cloudflare shows two nameservers. At the registrar where the records above live, replace the domain's nameservers with those two. This can take from minutes to a few hours; Cloudflare emails you when the domain is active.
+2. Cloudflare scans and copies your current records. **Delete both A records that point at 208.91.197.27.** Keep any MX or TXT records, so email on the domain keeps working.
+3. Cloudflare shows you two nameservers (like `xxx.ns.cloudflare.com`). Write them down.
+4. Sign in at domains.com → your domain list → `925cinema.com` → the **DNS & Nameservers** (or **Nameservers**) section → choose to use custom nameservers → replace the domains.com nameservers with the two Cloudflare ones → save. The exact menu names can differ slightly; domains.com support can do it for you if you ask them to "change the nameservers to Cloudflare's".
+5. Back in Cloudflare, press **Check nameservers**. It usually becomes active within an hour (up to 24), and Cloudflare emails you when it does. From then on, all DNS changes for the site happen in Cloudflare, not domains.com.
 
 ## 2. Deploy the web app on Render
 
@@ -65,11 +67,11 @@ cloudflared tunnel login
 ```
 
 ```bash
-cloudflared tunnel create oav-comfy
+cloudflared tunnel create cinema-comfy
 ```
 
 ```bash
-cloudflared tunnel route dns oav-comfy comfy.925cinema.com
+cloudflared tunnel route dns cinema-comfy comfy.925cinema.com
 ```
 
 Then lock it, **before** starting the tunnel:
@@ -81,7 +83,7 @@ Then lock it, **before** starting the tunnel:
 Now start the tunnel:
 
 ```bash
-cloudflared tunnel run --url http://localhost:8188 oav-comfy
+cloudflared tunnel run --url http://localhost:8188 cinema-comfy
 ```
 
 Check the lock from any computer. Without the token this must **not** return ComfyUI's JSON:

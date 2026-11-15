@@ -1,4 +1,4 @@
-// OpenArtVision web server: serves the studio UI and wires the agent chat (www.925cinema.com).
+// 925 Cinematic Studios web server: serves the studio UI and wires the agent chat (www.925cinema.com).
 import 'dotenv/config';
 import express from 'express';
 import cookieParser from 'cookie-parser';
@@ -260,7 +260,7 @@ projects.recoverProjects();
 
 const port = Number(process.env.PORT || 3000);
 app.listen(port, async () => {
-  console.log(`OpenArtVision running on http://localhost:${port}${MOCK ? ' (MOCK mode)' : ''}`);
+  console.log(`925 Cinematic Studios running on http://localhost:${port}${MOCK ? ' (MOCK mode)' : ''}`);
   if (!(await ffmpegAvailable())) console.warn('WARNING: ffmpeg not found; stitching and export will fail. Install ffmpeg or set FFMPEG_PATH.');
   if (!MOCK) {
     const e = await engineStatus({ fresh: true });

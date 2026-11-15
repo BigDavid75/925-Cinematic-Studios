@@ -1,7 +1,7 @@
 {
-  "name": "openartvision",
+  "name": "925-cinematic-studios",
   "version": "0.2.0",
-  "description": "OpenArtVision: a web-based AI creative studio with an agent chat (www.925cinema.com)",
+  "description": "925 Cinematic Studios: an AI film studio. Script to film, timeline, sound and export, plus an agent chat (www.925cinema.com)",
   "type": "module",
   "main": "server.js",
   "scripts": {

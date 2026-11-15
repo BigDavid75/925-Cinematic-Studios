@@ -1,4 +1,4 @@
-// OpenArtVision studio front end: home composer -> agent session with streamed thinking, approval cards and replies.
+// 925 Cinematic Studios studio front end: home composer -> agent session with streamed thinking, approval cards and replies.
 import * as studio from './studio.js';
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -422,7 +422,7 @@ async function send() {
     },
     text_start: () => { clearPending(); textBuf = ''; textEl = document.createElement('div'); textEl.className = 'md'; box.append(textEl); },
     text: (d) => { textBuf += d.text; if (!raf) raf = requestAnimationFrame(flushText); },
-    title: (d) => { $('#sessionTitle').textContent = d.title; document.title = `${d.title} · OpenArtVision`; refreshState(); },
+    title: (d) => { $('#sessionTitle').textContent = d.title; document.title = `${d.title} · 925 Cinematic Studios`; refreshState(); },
     done: (d) => setCredits(d.credits),
     error: (d) => { clearPending(); const el = document.createElement('div'); el.className = 'error-line'; el.textContent = d.message; box.append(el); }
   };
@@ -478,7 +478,7 @@ async function openSession(id, push = true) {
     state.sessionId = s.id;
     if (push) history.pushState({}, '', `/?s=${s.id}`);
     $('#sessionTitle').textContent = s.title;
-    document.title = `${s.title} · OpenArtVision`;
+    document.title = `${s.title} · 925 Cinematic Studios`;
     msgs.innerHTML = '';
     for (const entry of s.display) {
       if (entry.role === 'user') { renderUser(entry.text, entry.attachments || []); continue; }
@@ -501,7 +501,7 @@ function goHome(push = true) {
   if (push) history.pushState({}, '', '/');
   msgs.innerHTML = '';
   $('#sessionTitle').textContent = '';
-  document.title = 'OpenArtVision · AI creative studio';
+  document.title = '925 Cinematic Studios · AI film studio';
   placeComposer(false);
   refreshState();
   input.focus();
@@ -518,7 +518,7 @@ function leaveChat() {
 async function openStudioList(push = true) {
   leaveChat();
   if (push) history.pushState({}, '', '/?view=studio');
-  document.title = 'Script to Film · OpenArtVision';
+  document.title = 'Script to Film · 925 Cinematic Studios';
   showPage('studioList');
   try { await studio.renderList(); refreshState(); } catch (e) { toast(e.message); }
 }
@@ -528,13 +528,13 @@ async function openFilm(id, push = true) {
   try {
     const p = await studio.open(id);
     if (push) history.pushState({}, '', `/?p=${id}`);
-    document.title = `${p.title} · OpenArtVision`;
+    document.title = `${p.title} · 925 Cinematic Studios`;
   } catch (e) { toast(e.message); openStudioList(push); }
 }
 async function openGallery(push = true) {
   leaveChat();
   if (push) history.pushState({}, '', '/?view=gallery');
-  document.title = 'Gallery · OpenArtVision';
+  document.title = 'Gallery · 925 Cinematic Studios';
   showPage('gallery');
   try { await studio.renderGallery(); } catch (e) { toast(e.message); }
 }

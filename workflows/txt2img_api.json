@@ -36,6 +36,6 @@
   },
   "9": {
     "class_type": "SaveImage",
-    "inputs": { "filename_prefix": "openartvision", "images": ["8", 0] }
+    "inputs": { "filename_prefix": "925cinema", "images": ["8", 0] }
   }
 }
