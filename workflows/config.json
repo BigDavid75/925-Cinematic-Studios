@@ -1,38 +1,117 @@
 {
-  "_help": "Map each tool to a ComfyUI workflow exported with 'Export (API)'. Node ids must match YOUR export. Set a field to null if your workflow doesn't have it. 'video' is text-to-video (used for every Script to Film shot). 'video_i2v' is optional: add an image-to-video workflow as img2vid_api.json to let the chat agent animate an image.",
+  "_help": "Map each kind of generation to a ComfyUI workflow exported with 'Export (API)'. Node ids must match YOUR export. Set a field to null if your workflow doesn't have it. 'video' is text-to-video (every Script to Film shot, and chat clips with no source image). 'video_i2v' animates an image (chat clips made from an earlier image or an uploaded one). 'audio' adds synced sound to a finished silent clip (MMAudio); delete the 'audio' block to turn sound off. If your video workflow already saves an MP4 with sound (e.g. LTX-2), that sound is kept and the audio pass is skipped.",
   "image": {
     "file": "txt2img_api.json",
     "nodes": {
-      "prompt": ["6", "text"],
-      "negative": ["7", "text"],
-      "seed": ["3", "seed"],
-      "width": ["5", "width"],
-      "height": ["5", "height"]
+      "prompt": [
+        "6",
+        "text"
+      ],
+      "negative": [
+        "7",
+        "text"
+      ],
+      "seed": [
+        "3",
+        "seed"
+      ],
+      "width": [
+        "5",
+        "width"
+      ],
+      "height": [
+        "5",
+        "height"
+      ]
     }
   },
   "video": {
     "file": "txt2vid_api.json",
     "nodes": {
-      "prompt": ["6", "text"],
-      "seed": ["3", "seed"],
-      "width": ["55", "width"],
-      "height": ["55", "height"],
-      "frames": ["55", "length"],
-      "fps": ["57", "fps"]
+      "prompt": [
+        "6",
+        "text"
+      ],
+      "seed": [
+        "3",
+        "seed"
+      ],
+      "width": [
+        "55",
+        "width"
+      ],
+      "height": [
+        "55",
+        "height"
+      ],
+      "frames": [
+        "55",
+        "length"
+      ],
+      "fps": [
+        "57",
+        "fps"
+      ]
     },
     "fps": 16
   },
   "video_i2v": {
     "file": "img2vid_api.json",
     "nodes": {
-      "prompt": ["6", "text"],
-      "seed": ["3", "seed"],
-      "width": ["55", "width"],
-      "height": ["55", "height"],
-      "frames": ["55", "length"],
-      "fps": ["57", "fps"],
-      "image": ["56", "image"]
+      "prompt": [
+        "6",
+        "text"
+      ],
+      "seed": [
+        "3",
+        "seed"
+      ],
+      "width": [
+        "55",
+        "width"
+      ],
+      "height": [
+        "55",
+        "height"
+      ],
+      "frames": [
+        "55",
+        "length"
+      ],
+      "fps": [
+        "57",
+        "fps"
+      ],
+      "image": [
+        "56",
+        "image"
+      ]
     },
     "fps": 16
+  },
+  "audio": {
+    "file": "video2audio_api.json",
+    "nodes": {
+      "video": [
+        "1",
+        "file"
+      ],
+      "prompt": [
+        "12",
+        "prompt"
+      ],
+      "negative": [
+        "12",
+        "negative_prompt"
+      ],
+      "seed": [
+        "12",
+        "seed"
+      ],
+      "duration": [
+        "12",
+        "duration"
+      ]
+    }
   }
 }

@@ -34,3 +34,9 @@ test('subtitle files lose their timestamps', async () => {
   const t = await extractScriptText('a.srt', Buffer.from('1\n00:00:01,000 --> 00:00:02,000\nHello there\n\n2\n00:00:03,000 --> 00:00:04,000\nBye'));
   assert.equal(t, 'Hello there\n\nBye');
 });
+
+test('local shots get a sound line from their description', () => {
+  const [shot] = parseScript('EXT. CLIFF - DAWN\n\nWaves crash below as gulls wheel overhead.');
+  assert.match(shot.sound, /Waves crash/);
+  assert.doesNotMatch(shot.sound, /EXT\./);
+});

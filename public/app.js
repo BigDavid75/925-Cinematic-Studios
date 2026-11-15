@@ -23,6 +23,7 @@ const state = {
   approval: store.get('approval', 'ask'),
   quality: store.get('quality', 'quality'),
   jobs: {},
+  sound: false,
   polling: new Set()
 };
 
@@ -234,9 +235,14 @@ function updateJobCard(el, job) {
   const rows = [
     ['Aspect ratio', p.aspect_ratio],
     job.kind === 'video' ? ['Duration', `${p.duration_seconds}s`] : ['Resolution', p.resolution],
+    ...(job.kind === 'video' && state.sound ? [['Sound', p.sound || 'Silent']] : []),
     ['Model', job.engine],
     ['Credits', job.credits]
   ];
+  // Image-to-video: show the picture the clip starts from.
+  const sourceHtml = job.kind === 'video' && p.source_job_id
+    ? `<div class="card-source"><img src="/api/media/${esc(p.source_job_id)}/0" alt=""><span>Starts from this image${job.status === 'done' && job.usedSource === false ? ' (no image-to-video workflow installed, so it was made from the prompt)' : ''}</span></div>`
+    : '';
   const editing = el.classList.contains('editing');
   el.classList.toggle('dismissed', job.status === 'dismissed');
 
@@ -247,18 +253,21 @@ function updateJobCard(el, job) {
       ${job.kind === 'video'
         ? `<dt>Duration</dt><dd><select data-f="duration_seconds">${[2, 3, 4, 5].map((d) => `<option value="${d}" ${d == p.duration_seconds ? 'selected' : ''}>${d}s</option>`).join('')}</select></dd>`
         : `<dt>Resolution</dt><dd><select data-f="resolution">${['1K', '2K'].map((r) => `<option ${r === p.resolution ? 'selected' : ''}>${r}</option>`).join('')}</select></dd>`}
+      ${job.kind === 'video' && state.sound ? `<dt>Sound</dt><dd><input data-f="sound" value="${esc(p.sound || '')}" maxlength="300" placeholder="Silent"></dd>` : ''}
       </dl>
       <div class="card-actions"><button class="btn" data-a="cancel-edit">Cancel</button><button class="btn btn-primary" data-a="approve">Approve</button></div>`;
   } else {
-    body = `<button class="card-prompt" type="button" data-a="toggle-prompt"><span>${esc(p.prompt)}</span><span class="chev-r">›</span></button>
+    body = `${sourceHtml}<button class="card-prompt" type="button" data-a="toggle-prompt"><span>${esc(p.prompt)}</span><span class="chev-r">›</span></button>
       <dl class="card-rows">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`;
     if (job.status === 'awaiting_approval') body += `<div class="card-actions"><button class="btn btn-primary" data-a="approve">Approve</button></div>`;
-    if (job.status === 'running') body += `<div class="progress"><div style="width:${Math.round(job.progress * 100)}%"></div></div><div class="card-status">Generating on ${esc(job.engine)}... ${Math.round(job.progress * 100)}%</div>`;
+    if (job.status === 'running') body += `<div class="progress"><div style="width:${Math.round(job.progress * 100)}%"></div></div><div class="card-status">${job.phase === 'sound' ? 'Adding sound' : `Generating on ${esc(job.engine)}`}... ${Math.round(job.progress * 100)}%</div>`;
+    if (job.status === 'done' && job.soundError) body += `<div class="card-status err">Sound failed (${esc(job.soundError)}), so this clip is silent. Sound credits refunded.</div>`;
     if (job.status === 'failed') body += `<div class="card-status err">Failed: ${esc(job.error)}. Credits refunded.</div>`;
     if (job.status === 'dismissed') body += `<div class="card-status">Dismissed</div>`;
     if (job.status === 'done') {
       body += job.outputs.map((o, i) => {
         const src = `/api/media/${job.id}/${i}`;
+        if (o.media === 'audio') return '';
         return `<div class="card-media">${o.media === 'video' && !/\.(gif|webp)$/i.test(o.filename) ? `<video src="${src}" controls loop playsinline></video>` : `<img src="${src}" alt="${esc(p.title)}">`}</div>
           <div class="media-actions"><a href="${src}" download="${esc(o.filename)}">Download</a><a href="${src}" target="_blank" rel="noopener">Open</a></div>`;
       }).join('');
@@ -326,9 +335,29 @@ async function refreshState() {
   try {
     const s = await api('/api/state');
     setCredits(s.credits);
+    state.sound = s.sound;
     $('#mockPill').hidden = !s.mock;
+    if (!s.mock) refreshEngine();
     renderRecents(s.sessions);
   } catch {}
+}
+
+// Engine pill: is the Mac reachable, and is the tunnel locked behind Cloudflare Access?
+let engineChecked = 0;
+async function refreshEngine(force = false) {
+  if (!force && Date.now() - engineChecked < 60000) return;
+  engineChecked = Date.now();
+  const pill = $('#enginePill');
+  try {
+    const e = await api(`/api/engine${force ? '?fresh=1' : ''}`);
+    const unlocked = !e.private && (!e.token || e.locked === false);
+    pill.hidden = false;
+    pill.className = `pill engine ${unlocked ? 'bad' : e.reachable ? 'ok' : 'off'}`;
+    pill.textContent = unlocked ? 'Engine unlocked' : e.reachable ? 'Engine online' : 'Engine offline';
+    pill.title = unlocked
+      ? 'ComfyUI is reachable without the Cloudflare Access token. Generation is blocked until the tunnel is locked (build guide, Step 7).'
+      : e.reachable ? 'Your Mac is connected.' : e.error || 'Your Mac is not reachable. Wake it and start ComfyUI and the tunnel.';
+  } catch { pill.hidden = true; }
 }
 
 function renderRecents(list) {
@@ -518,6 +547,7 @@ function route(push = false) {
   return goHome(push);
 }
 studio.init({ api, toast, setCredits });
+$('#enginePill').onclick = () => refreshEngine(true);
 document.addEventListener('oav:open-film', (e) => openFilm(e.detail));
 $('#newFilm').onclick = async () => { try { openFilm(await studio.newFilm()); } catch (e) { toast(e.message); } };
 $('#studioBack').onclick = () => openStudioList();

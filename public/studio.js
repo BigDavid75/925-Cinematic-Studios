@@ -14,7 +14,7 @@ let busy = false;            // a request that replaces the shot list is in flig
 const el = {};
 export function init(helpers) {
   ({ api, toast, setCredits } = helpers);
-  for (const id of ['pTitle', 'pAspect', 'pQuality', 'pStyle', 'pScript', 'useAI', 'aiWrap', 'breakdown', 'uploadScript', 'scriptFile', 'scriptHint',
+  for (const id of ['pTitle', 'pAspect', 'pQuality', 'pSound', 'soundField', 'pStyle', 'pScript', 'useAI', 'aiWrap', 'breakdown', 'uploadScript', 'scriptFile', 'scriptHint',
     'shots', 'shotsHint', 'generateAll', 'cancelQueue', 'addShot', 'preview', 'playerEmpty', 'player', 'filmHint', 'exFormat', 'exRes', 'pTransition',
     'exportBtn', 'exports', 'track', 'timeline', 'playhead', 'timelineHint', 'scriptPanel', 'filmGrid', 'galleryGrid']) el[id] = document.getElementById(id);
   wire();
@@ -103,6 +103,9 @@ function render() {
   el.pAspect.value = p.aspect_ratio;
   el.pQuality.value = p.quality;
   el.pTransition.value = p.transition;
+  el.pSound.value = p.sound ? 'on' : 'off';
+  el.soundField.hidden = !p.soundAvailable;
+  el.shots.classList.toggle('no-sound', !(p.sound && p.soundAvailable));
   el.exRes.options[0].textContent = `Source (${p.aspect_ratio === '1:1' ? '640' : '480'}p)`;
   el.useAI.disabled = !p.ai;
   el.aiWrap.title = p.ai ? 'Claude splits the script into shots and writes a video prompt for each' : 'Needs ANTHROPIC_API_KEY on the server (off in mock mode). Without it the script is split locally.';
@@ -126,6 +129,7 @@ function renderShots() {
           <input class="shot-heading" data-f="heading" value="${esc(s.heading)}" maxlength="90" aria-label="Shot name" />
           ${s.text && s.text !== s.prompt ? `<div class="shot-script" title="${esc(s.text)}">${esc(s.text)}</div>` : ''}
           <textarea class="shot-prompt" data-f="prompt" rows="3" maxlength="900" placeholder="Describe what the camera sees: subject, action, camera move, setting, light.">${esc(s.prompt)}</textarea>
+          <label class="shot-sound"><span>♪</span><input data-f="sound" value="${esc(s.sound || '')}" maxlength="300" placeholder="Sound: ambience, effects, music mood (blank = from the picture)" aria-label="Sound for this shot" /></label>
           <div class="shot-bar">
             <select data-f="duration_seconds" aria-label="Clip length">${[2, 3, 4, 5].map((d) => `<option value="${d}" ${d === s.duration_seconds ? 'selected' : ''}>${d}s</option>`).join('')}</select>
             <span class="shot-status"></span>
@@ -143,7 +147,9 @@ function statusHtml(s) {
   const j = s.job;
   if (!j) return s.clip ? '' : '<span class="st">Not rendered</span>';
   if (j.status === 'queued') return '<span class="st wait">Queued</span>';
-  if (j.status === 'running') return `<span class="st run"><span class="spinner"></span>Rendering ${Math.round((j.progress || 0) * 100)}%</span>`;
+  if (j.status === 'running') return `<span class="st run"><span class="spinner"></span>${j.phase === 'sound' ? 'Adding sound' : 'Rendering'} ${Math.round((j.progress || 0) * 100)}%</span>`;
+  if (j.status === 'done' && j.soundError) return `<span class="st err" title="${esc(j.soundError)}">On timeline, silent: sound failed</span>`;
+  if (j.status === 'done' && j.sound) return '<span class="st ok">On timeline · with sound</span>';
   if (j.status === 'failed') return `<span class="st err" title="${esc(j.error)}">Failed: ${esc(j.error)}</span>`;
   if (j.status === 'cancelled') return '<span class="st">Cancelled</span>';
   return '<span class="st ok">On timeline</span>';
@@ -191,7 +197,7 @@ function renderTimeline() {
     return `<button class="tl-clip ${st} ${s.id === selected ? 'selected' : ''}" data-shot="${s.id}" style="width:${Math.max(64, s.duration_seconds * PX_PER_SEC)}px" title="${esc(s.heading)}">
       ${s.clip ? `<video src="${s.clip}#t=0.1" muted preload="metadata" playsinline tabindex="-1"></video>` : ''}
       <span class="tl-n">${i + 1}</span><span class="tl-name">${esc(s.heading)}</span>
-      <span class="tl-state">${{ queued: 'Queued', running: 'Rendering', failed: 'Failed', empty: 'Empty', done: `${s.duration_seconds}s` }[st]}</span>${prog}
+      <span class="tl-state">${{ queued: 'Queued', running: s.job?.phase === 'sound' ? 'Sound' : 'Rendering', failed: 'Failed', empty: 'Empty', done: `${s.clip && s.job?.sound ? '♪ ' : ''}${s.duration_seconds}s` }[st]}</span>${prog}
     </button>`;
   });
   // Only touch clips that changed, so thumbnails don't reload on every poll.
@@ -261,7 +267,7 @@ function renderFilm() {
   el.filmHint.innerHTML = !pv ? ''
     : pv.status === 'building' ? '<span class="spinner"></span> Stitching…'
     : pv.status === 'failed' ? `<span class="st err">Stitch failed: ${esc(pv.error)}</span>`
-    : `${pv.segments.length} of ${project.shots.length} shots · ${fmtTime(pv.duration)}${done < project.shots.length ? ' · partial' : ''}`;
+    : `${pv.segments.length} of ${project.shots.length} shots · ${fmtTime(pv.duration)}${pv.audio ? ' · with sound' : ''}${done < project.shots.length ? ' · partial' : ''}`;
   el.exportBtn.disabled = !done;
 }
 
@@ -270,7 +276,7 @@ function renderExports() {
     const what = `${esc(e.label || e.format)} · ${e.resolution === 'source' ? 'source size' : e.resolution}${e.clips < e.shots ? ` · ${e.clips} of ${e.shots} shots` : ''}`;
     if (e.status === 'running') return `<div class="export"><div><span>${what}</span><div class="progress"><div style="width:${Math.round((e.progress || 0) * 100)}%"></div></div></div><span class="st run">${Math.round((e.progress || 0) * 100)}%</span></div>`;
     if (e.status === 'failed') return `<div class="export"><span>${what}</span><span class="st err" title="${esc(e.error)}">Failed</span></div>`;
-    return `<div class="export"><span>${what} · ${fmtTime(e.duration)} · ${fmtSize(e.size)}</span><a class="btn fit sm btn-primary" href="${e.url}" download>Download</a></div>`;
+    return `<div class="export"><span>${what} · ${fmtTime(e.duration)} · ${e.audio ? 'with sound' : 'silent'} · ${fmtSize(e.size)}</span><a class="btn fit sm btn-primary" href="${e.url}" download>Download</a></div>`;
   }).join('');
 }
 
@@ -296,6 +302,7 @@ function wire() {
   saveSetting(el.pAspect, 'aspect_ratio');
   saveSetting(el.pQuality, 'quality');
   saveSetting(el.pTransition, 'transition');
+  el.pSound.addEventListener('change', guard(() => project && patch('', { sound: el.pSound.value === 'on' })));
   el.useAI.addEventListener('change', () => localStorage.setItem('oav:useAI', el.useAI.checked ? '1' : '0'));
 
   el.uploadScript.onclick = () => el.scriptFile.click();

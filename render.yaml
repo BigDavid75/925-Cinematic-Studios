@@ -2,7 +2,7 @@
 # In Render: New > Blueprint > pick this repo. Secrets marked sync:false are entered in the dashboard.
 services:
   - type: web
-    name: openartvision
+    name: 925cinema
     runtime: docker
     plan: starter
     healthCheckPath: /healthz

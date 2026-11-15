@@ -7,16 +7,24 @@ import crypto from 'node:crypto';
 import * as store from './lib/store.js';
 import { runTurn, buildUserContent, makeTitle } from './lib/agent.js';
 import fs from 'node:fs';
-import { fetchOutput } from './lib/comfy.js';
-import { creditsFor } from './lib/tools.js';
+import { fetchOutput, engineStatus, imageToVideoEnabled } from './lib/comfy.js';
+import { creditsFor, soundCreditsFor } from './lib/tools.js';
 import { runMockTurn, mockTitle, mockMedia } from './lib/mock.js';
-import { startJob, localFile, recoverJobs } from './lib/engine.js';
+import { startJob, localFile, recoverJobs, registerUpload, soundAvailable } from './lib/engine.js';
 import * as projects from './lib/projects.js';
 import { extractScriptText } from './lib/script.js';
 import { FORMATS, ffmpegAvailable } from './lib/video.js';
 
 const MOCK = process.env.MOCK === '1';
 const PASSWORD = process.env.SITE_PASSWORD || '';
+const PRODUCTION = process.env.NODE_ENV === 'production';
+
+// Without a password, anyone who finds the site can spend your Claude API credits and use your Mac.
+if (PRODUCTION && !MOCK && (!PASSWORD || PASSWORD === 'change-me')) {
+  console.error('Refusing to start: set SITE_PASSWORD (not "change-me") before putting the site online.');
+  process.exit(1);
+}
+if (PRODUCTION && !process.env.COOKIE_SECRET) console.warn('WARNING: COOKIE_SECRET is not set; everyone is logged out on every restart.');
 const app = express();
 app.set('trust proxy', 1);
 app.use(express.json({ limit: '40mb' }));
@@ -42,7 +50,14 @@ app.use('/api', (req, res, next) => {
 
 // ---------- state ----------
 app.get('/api/state', (req, res) => {
-  res.json({ credits: store.getCredits(), sessions: store.listSessions(), projects: store.listProjects().map(projects.summary), mock: MOCK, ai: projects.canUseAI() });
+  res.json({ credits: store.getCredits(), sessions: store.listSessions(), projects: store.listProjects().map(projects.summary), mock: MOCK, ai: projects.canUseAI(), sound: soundAvailable(), imageToVideo: MOCK || imageToVideoEnabled() });
+});
+
+// Is the Mac reachable, and is the tunnel locked? Shown as the engine pill in the top bar.
+app.get('/api/engine', async (req, res) => {
+  if (MOCK) return res.json({ mock: true, reachable: true, locked: true, private: true });
+  const s = await engineStatus({ fresh: req.query.fresh === '1' });
+  res.json({ ...s, url: undefined });
 });
 
 app.get('/api/sessions/:id', (req, res) => {
@@ -77,12 +92,14 @@ app.post('/api/chat', async (req, res) => {
   res.on('close', () => controller.abort());
 
   emit('session', { id: session.id, title: session.title });
-  session.display.push({ role: 'user', text, attachments: attachments.map((a) => ({ dataUrl: a.dataUrl, name: a.name })) });
+  // Attached images are saved (so the agent can animate them by id) and shown from the server, not stored inline.
+  const uploads = attachments.slice(0, 4).map((a) => registerUpload(session, a)).filter(Boolean);
+  session.display.push({ role: 'user', text, attachments: uploads.map((u) => ({ dataUrl: `/api/media/${u.id}/0`, name: u.params.title })) });
 
   const opts = { model, approval, quality };
   const args = {
     session,
-    userContent: buildUserContent(session, text, attachments),
+    userContent: buildUserContent(session, text, attachments, uploads),
     opts,
     emit,
     signal: controller.signal,
@@ -126,9 +143,11 @@ app.post('/api/jobs/:id/approve', (req, res) => {
   if (!job) return res.status(404).json({ error: 'not_found' });
   if (job.status !== 'awaiting_approval') return res.status(409).json({ error: `Job is ${job.status}` });
   if (req.body?.params) {
-    const { prompt, aspect_ratio, resolution, duration_seconds } = req.body.params;
+    const { prompt, aspect_ratio, resolution, duration_seconds, sound } = req.body.params;
     Object.assign(job.params, Object.fromEntries(Object.entries({ prompt, aspect_ratio, resolution, duration_seconds }).filter(([, v]) => v !== undefined)));
+    if (job.kind === 'video' && typeof sound === 'string') job.params.sound = soundAvailable() ? sound.trim().slice(0, 300) : '';
     job.credits = creditsFor(job.kind, job.params, job.quality);
+    job.soundCredits = job.kind === 'video' ? soundCreditsFor(job.params) : 0;
   }
   if (!store.spendCredits(job.credits)) return res.status(402).json({ error: 'Not enough credits' });
   store.getSession(job.sessionId)?.notes.push(`User approved job ${job.id} ("${job.params.title}")${req.body?.params ? ' after editing it' : ''}.`);
@@ -165,7 +184,7 @@ app.get('/api/media/:jobId/:index', async (req, res) => {
 
 app.get('/api/gallery', (req, res) => {
   const items = store.listJobs()
-    .filter((j) => j.status === 'done' && j.outputs?.length)
+    .filter((j) => j.status === 'done' && j.outputs?.length && j.kind !== 'upload')
     .sort((a, b) => b.createdAt - a.createdAt)
     .slice(0, 120)
     .map((j) => {
@@ -243,5 +262,11 @@ const port = Number(process.env.PORT || 3000);
 app.listen(port, async () => {
   console.log(`OpenArtVision running on http://localhost:${port}${MOCK ? ' (MOCK mode)' : ''}`);
   if (!(await ffmpegAvailable())) console.warn('WARNING: ffmpeg not found; stitching and export will fail. Install ffmpeg or set FFMPEG_PATH.');
+  if (!MOCK) {
+    const e = await engineStatus({ fresh: true });
+    if (!e.private && !e.token) console.warn(`WARNING: COMFY_URL (${e.url}) is public but CF_ACCESS_CLIENT_ID/SECRET are not set. Generation is blocked until the tunnel is locked.`);
+    else if (e.locked === false) console.warn(`WARNING: ${e.url} answers without the Cloudflare Access token. Generation is blocked until you add an Access policy.`);
+    else console.log(e.reachable ? `Engine reachable at ${e.url}${e.private ? '' : ' (locked with Cloudflare Access)'}` : `Engine not reachable yet: ${e.error}`);
+  }
   if (!PASSWORD) console.warn('WARNING: SITE_PASSWORD is not set; anyone with the URL can use your API credits.');
 });
