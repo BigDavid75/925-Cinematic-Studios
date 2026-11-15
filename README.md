@@ -1,6 +1,6 @@
 # OpenArtVision
 
-A web-based AI creative studio for **www.openartvision.com**, in the style of Runway. Generation runs on your own ComfyUI engine (your Mac, through a tunnel). Two ways to work:
+A web-based AI creative studio for **www.925cinema.com**, in the style of Runway. Generation runs on your own ComfyUI engine (your Mac, through a tunnel). Two ways to work:
 
 - **Script to Film:** upload a script, get one clip per shot on a timeline in script order, stitched into one film you can export.
 - **Agent chat:** describe an idea; a Claude-powered agent proposes image or video generations as approval cards.
@@ -53,12 +53,12 @@ Stitching and export need **ffmpeg** on the machine that runs the web server (`b
 
 `"fps": 16` in `config.json` sets both the frame count (seconds × fps + 1) and the saved frame rate. 16 keeps clips light on a 16GB Mac; Wan 2.2 5B's native rate is 24.
 
-## Deploy to www.openartvision.com
+## Deploy to www.925cinema.com
 
-1. Put `openartvision.com` DNS on Cloudflare (free plan).
+1. Put `925cinema.com` DNS on Cloudflare (free plan). Register the domain first if you have not.
 2. Deploy this repo on Render, Railway or Fly.io as a Docker web service. Set the env vars from `.env.example`, and add a persistent disk mounted at `/app/data` (sessions, clips, timelines and exports live there). On Render, `render.yaml` at the repo root does this as a Blueprint: New → Blueprint → pick the repo, then fill in the secrets it asks for.
-3. Add the custom domain `www.openartvision.com` in your host's dashboard, create the CNAME it gives you in Cloudflare, and redirect the bare domain `openartvision.com` to `www`.
-4. On your Mac, expose ComfyUI with a Cloudflare Tunnel at `comfy.openartvision.com`, protected by a Cloudflare Access service token. Put the token in `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET`.
+3. Add the custom domain `www.925cinema.com` in your host's dashboard, create the CNAME it gives you in Cloudflare, and redirect the bare domain `925cinema.com` to `www`.
+4. On your Mac, expose ComfyUI with a Cloudflare Tunnel at `comfy.925cinema.com`, protected by a Cloudflare Access service token. Put the token in `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET`.
 
 The full step-by-step walkthrough is in the build guide.
 

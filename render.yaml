@@ -1,4 +1,4 @@
-# Render blueprint for www.openartvision.com.
+# Render blueprint for www.925cinema.com.
 # In Render: New > Blueprint > pick this repo. Secrets marked sync:false are entered in the dashboard.
 services:
   - type: web
@@ -7,7 +7,7 @@ services:
     plan: starter
     healthCheckPath: /healthz
     domains:
-      - www.openartvision.com
+      - www.925cinema.com
     disk:
       name: data
       mountPath: /app/data
@@ -20,7 +20,7 @@ services:
       - key: COOKIE_SECRET
         generateValue: true
       - key: COMFY_URL
-        value: https://comfy.openartvision.com
+        value: https://comfy.925cinema.com
       - key: CF_ACCESS_CLIENT_ID
         sync: false
       - key: CF_ACCESS_CLIENT_SECRET

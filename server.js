@@ -1,4 +1,4 @@
-// OpenArtVision web server: serves the studio UI and wires the agent chat (www.openartvision.com).
+// OpenArtVision web server: serves the studio UI and wires the agent chat (www.925cinema.com).
 import 'dotenv/config';
 import express from 'express';
 import cookieParser from 'cookie-parser';

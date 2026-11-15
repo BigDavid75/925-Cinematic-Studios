@@ -1,7 +1,7 @@
 {
   "name": "openartvision",
   "version": "0.2.0",
-  "description": "OpenArtVision: a web-based AI creative studio with an agent chat (www.openartvision.com)",
+  "description": "OpenArtVision: a web-based AI creative studio with an agent chat (www.925cinema.com)",
   "type": "module",
   "main": "server.js",
   "scripts": {
