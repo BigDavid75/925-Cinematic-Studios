@@ -10,7 +10,9 @@ import fs from 'node:fs';
 import { fetchOutput, engineStatus, imageToVideoEnabled } from './lib/comfy.js';
 import { creditsFor, soundCreditsFor } from './lib/tools.js';
 import { runMockTurn, mockTitle, mockMedia } from './lib/mock.js';
-import { startJob, localFile, recoverJobs, registerUpload, soundAvailable } from './lib/engine.js';
+import { startJob, localFile, recoverJobs, soundAvailable } from './lib/engine.js';
+import * as assets from './lib/assets.js';
+import * as characters from './lib/characters.js';
 import * as projects from './lib/projects.js';
 import { extractScriptText } from './lib/script.js';
 import { FORMATS, ffmpegAvailable } from './lib/video.js';
@@ -50,7 +52,7 @@ app.use('/api', (req, res, next) => {
 
 // ---------- state ----------
 app.get('/api/state', (req, res) => {
-  res.json({ credits: store.getCredits(), sessions: store.listSessions(), projects: store.listProjects().map(projects.summary), mock: MOCK, ai: projects.canUseAI(), sound: soundAvailable(), imageToVideo: MOCK || imageToVideoEnabled() });
+  res.json({ credits: store.getCredits(), sessions: store.listSessions(), projects: store.listProjects().map(projects.summary), mock: MOCK, ai: projects.canUseAI(), sound: soundAvailable(), imageToVideo: MOCK || imageToVideoEnabled(), accept: assets.ACCEPT, library: { assets: store.listAssets().length, characters: store.listCharacters().length } });
 });
 
 // Is the Mac reachable, and is the tunnel locked? Shown as the engine pill in the top bar.
@@ -75,7 +77,7 @@ app.delete('/api/sessions/:id', (req, res) => {
 
 // ---------- chat (Server-Sent Events over a POST) ----------
 app.post('/api/chat', async (req, res) => {
-  const { sessionId, text = '', attachments = [], model, approval = 'ask', quality = 'quality' } = req.body;
+  const { sessionId, text = '', assetIds = [], attachments = [], model, approval = 'ask', quality = 'quality' } = req.body;
   let session = sessionId && store.getSession(sessionId);
   const isNew = !session;
   if (!session) session = store.createSession();
@@ -92,14 +94,34 @@ app.post('/api/chat', async (req, res) => {
   res.on('close', () => controller.abort());
 
   emit('session', { id: session.id, title: session.title });
-  // Attached images are saved (so the agent can animate them by id) and shown from the server, not stored inline.
-  const uploads = attachments.slice(0, 4).map((a) => registerUpload(session, a)).filter(Boolean);
-  session.display.push({ role: 'user', text, attachments: uploads.map((u) => ({ dataUrl: `/api/media/${u.id}/0`, name: u.params.title })) });
+
+  // Files arrive already uploaded to the asset library (assetIds). Older clients may still send data URLs.
+  const sent = assetIds.slice(0, 20).map((id) => store.getAsset(id)).filter(Boolean);
+  for (const a of attachments.slice(0, 4)) {
+    const m = /^data:([^;]+);base64,(.+)$/.exec(a.dataUrl || '');
+    if (m) try { sent.push(await assets.ingest(Buffer.from(m[2], 'base64'), { name: a.name || 'image.png', mime: m[1], sessionId: session.id })); } catch (e) { emit('error', { message: e.message }); }
+  }
+  for (const a of sent) if (!a.sessionId) { a.sessionId = session.id; store.putAsset(a); }
+  session.display.push({ role: 'user', text, assets: sent.map((a) => ({ id: a.id, kind: a.kind, name: a.name })) });
+
+  // File the uploads under the right characters before the agent sees them.
+  let assignment = null;
+  if (sent.length) {
+    emit('library_pending', { count: sent.length });
+    assignment = await characters.autoAssign(sent, text);
+    const part = { type: 'library', lines: [
+      ...(assignment.created.length ? [`New characters: ${assignment.created.map((c) => c.name).join(', ')}`] : []),
+      ...assignment.summary.map((x) => `${x.name} → ${x.characters.length ? x.characters.join(', ') : 'unassigned'}`)
+    ] };
+    session.pendingLibrary = part;
+    emit('library', part);
+  }
 
   const opts = { model, approval, quality };
   const args = {
     session,
-    userContent: buildUserContent(session, text, attachments, uploads),
+    userContent: buildUserContent(session, text, sent, assignment),
+    assignment,
     opts,
     emit,
     signal: controller.signal,
@@ -108,8 +130,15 @@ app.post('/api/chat', async (req, res) => {
 
   try {
     await (MOCK ? runMockTurn(args) : runTurn(args));
+    // Show the library card at the top of this reply when the session is reopened.
+    if (session.pendingLibrary) {
+      const last = session.display.at(-1);
+      if (last?.role === 'assistant') last.parts.unshift(session.pendingLibrary);
+      delete session.pendingLibrary;
+    }
     if (isNew || session.title === 'Untitled session') {
-      const title = (MOCK ? mockTitle(text) : await makeTitle(text)) || 'Untitled session';
+      const titleFrom = text || `Files: ${sent.map((a) => a.name).join(', ')}`;
+      const title = (MOCK ? mockTitle(titleFrom) : await makeTitle(titleFrom)) || 'Untitled session';
       session.title = title;
       store.save();
       emit('title', { title });
@@ -192,6 +221,112 @@ app.get('/api/gallery', (req, res) => {
       return { id: j.id, kind: j.outputs[i].media, title: j.params.title, prompt: j.params.prompt, url: `/api/media/${j.id}/${i}`, filename: j.outputs[i].filename, projectId: j.projectId, sessionId: j.sessionId };
     });
   res.json({ items });
+});
+
+// ---------- asset library ----------
+// Uploads are sent as the raw file body (any size up to 200 MB), name and type in the query string.
+app.post('/api/assets', express.raw({ type: () => true, limit: assets.MAX_UPLOAD_BYTES }), async (req, res) => {
+  try {
+    const a = await assets.ingest(req.body, { name: String(req.query.name || 'file'), mime: String(req.query.type || req.headers['content-type'] || ''), sessionId: req.query.sessionId || null });
+    let assignment = null;
+    if (req.query.assign === '1') assignment = await characters.autoAssign([a], String(req.query.context || ''));
+    res.json({ asset: assets.view(store.getAsset(a.id)), assignment });
+  } catch (e) {
+    res.status(e.type === 'entity.too.large' ? 413 : 400).json({ error: e.type === 'entity.too.large' ? 'That file is over 200 MB' : e.message });
+  }
+});
+
+app.get('/api/assets', (req, res) => {
+  let list = store.listAssets();
+  if (req.query.kind) list = list.filter((a) => a.kind === req.query.kind);
+  if (req.query.character === 'none') list = list.filter((a) => !a.characterIds?.length);
+  else if (req.query.character) list = list.filter((a) => a.characterIds?.includes(req.query.character));
+  if (req.query.q) { const q = String(req.query.q).toLowerCase(); list = list.filter((a) => a.name.toLowerCase().includes(q)); }
+  res.json({ assets: list.map(assets.view), characters: store.listCharacters().map(characters.characterView), accept: assets.ACCEPT, ai: characters.canUseAI() });
+});
+
+app.get('/api/assets/:id', (req, res) => {
+  const a = store.getAsset(req.params.id);
+  if (!a) return res.status(404).json({ error: 'not_found' });
+  res.json(assets.view(a));
+});
+
+app.get('/api/assets/:id/file', (req, res) => {
+  const a = store.getAsset(req.params.id);
+  const variant = ['thumb', 'original', 'text'].includes(req.query.v) ? req.query.v : 'display';
+  const p = a && assets.assetPath(a, variant);
+  if (!p) return res.status(404).end();
+  const type = assets.mimeFor(p);
+  if (type) res.type(type);
+  if (variant === 'original' || req.query.download === '1') res.attachment(a.name);
+  res.set('Cache-Control', 'private, max-age=31536000, immutable').sendFile(p);
+});
+
+app.patch('/api/assets/:id', (req, res) => {
+  const a = store.getAsset(req.params.id);
+  if (!a) return res.status(404).json({ error: 'not_found' });
+  if (typeof req.body.name === 'string' && req.body.name.trim()) a.name = req.body.name.trim().slice(0, 160);
+  if (Array.isArray(req.body.characterIds)) characters.assign(a, req.body.characterIds, { replace: true });
+  if (Array.isArray(req.body.add)) characters.assign(a, req.body.add);
+  if (Array.isArray(req.body.remove)) characters.unassign(a, req.body.remove);
+  store.putAsset(a);
+  res.json(assets.view(a));
+});
+
+app.delete('/api/assets/:id', (req, res) => {
+  const a = store.getAsset(req.params.id);
+  if (a) assets.removeAsset(a);
+  res.json({ ok: true });
+});
+
+// Re-run the matcher on some or all unassigned assets.
+app.post('/api/assets/assign', async (req, res) => {
+  const ids = Array.isArray(req.body.assetIds) && req.body.assetIds.length ? req.body.assetIds : store.listAssets().filter((a) => !a.characterIds?.length).map((a) => a.id);
+  const list = ids.slice(0, 40).map((id) => store.getAsset(id)).filter(Boolean);
+  const r = await characters.autoAssign(list, String(req.body.context || ''));
+  res.json(r);
+});
+
+// Save a generated image or clip into the library (e.g. a character sheet the agent made).
+app.post('/api/assets/from-job/:jobId/:index', async (req, res) => {
+  const job = store.getJob(req.params.jobId);
+  const out = job?.outputs?.[Number(req.params.index)];
+  if (!out) return res.status(404).json({ error: 'not_found' });
+  try {
+    const p = localFile(out);
+    let buffer;
+    if (p && fs.existsSync(p)) buffer = fs.readFileSync(p);
+    else if (out.mock) buffer = Buffer.from(mockMedia(job));
+    else buffer = (await fetchOutput(out)).buffer;
+    if (out.media === 'video') return res.status(400).json({ error: 'Clips stay in the Gallery; the asset library holds images, documents and audio.' });
+    const name = `${(job.params.title || 'generated').replace(/[^\w\- ]+/g, '').trim() || 'generated'}${out.mock ? '.svg' : path.extname(out.filename) || '.png'}`;
+    const a = await assets.ingest(buffer, { name, sessionId: job.sessionId, origin: 'generated' });
+    const assignment = await characters.autoAssign([a], `${job.params.title}. ${job.params.prompt}`);
+    res.json({ asset: assets.view(store.getAsset(a.id)), assignment });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.get('/api/characters', (req, res) => res.json({ characters: store.listCharacters().map(characters.characterView) }));
+app.post('/api/characters', (req, res) => {
+  try { res.json(characters.characterView(characters.createCharacter(req.body))); } catch (e) { res.status(400).json({ error: e.message }); }
+});
+app.patch('/api/characters/:id', (req, res) => {
+  const c = store.getCharacter(req.params.id);
+  if (!c) return res.status(404).json({ error: 'not_found' });
+  if (typeof req.body.name === 'string' && req.body.name.trim()) {
+    const other = characters.findCharacter(req.body.name);
+    if (other && other.id !== c.id) return res.status(409).json({ error: `There is already a character named ${other.name}` });
+    c.name = req.body.name.trim().slice(0, 60);
+  }
+  if (typeof req.body.description === 'string') c.description = req.body.description.slice(0, 600);
+  store.putCharacter(c);
+  res.json(characters.characterView(c));
+});
+app.delete('/api/characters/:id', (req, res) => {
+  store.deleteCharacter(req.params.id);
+  res.json({ ok: true });
 });
 
 // ---------- studio: script -> shots -> timeline -> film ----------

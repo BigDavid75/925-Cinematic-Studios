@@ -16,13 +16,18 @@
         <span>925 Cinematic Studios</span>
         <button class="icon-btn only-mobile" id="closeSidebar" aria-label="Close menu">✕</button>
       </div>
-      <button class="new-chat" id="newChat"><span class="plus">+</span> New Chat</button>
+      <div class="new-chat-row">
+        <button class="new-chat" id="newChat"><span class="plus">+</span> New Chat</button>
+        <button class="new-chat-more" id="newMenu" type="button" aria-label="More ways to start">⌄</button>
+      </div>
       <nav class="nav">
         <a href="/" data-nav="home" class="active"><span class="ni">⌂</span> Home</a>
+        <a href="/" data-nav="agent"><span class="ni">✦</span> Agent</a>
         <a href="/?view=studio" data-nav="studio"><span class="ni">▤</span> Script to Film</a>
+        <a href="/?view=assets" data-nav="assets"><span class="ni">◫</span> Assets</a>
         <a href="/?view=gallery" data-nav="gallery"><span class="ni">▦</span> Gallery</a>
       </nav>
-      <div class="recents-head"><span>Recents</span></div>
+      <div class="recents-head"><span>Recents</span><span class="grow"></span><button class="icon-btn sm" id="recentsNew" type="button" title="New chat">+</button><button class="icon-btn sm" id="recentsFilter" type="button" title="Filter">≡</button></div>
       <ul class="recents" id="recents"></ul>
       <div class="side-foot">
         <div class="credit-card"><span id="creditsSide">—</span> credits</div>
@@ -51,13 +56,21 @@
           </div>
           <div id="homeSlot"></div>
         </div>
-        <div class="quick" id="quick">
-          <button data-go="studio" class="quick-accent">Turn a script into a film</button>
-          <button data-fill="Create a character lineup model sheet for an original ">Character sheet</button>
-          <button data-fill="Storyboard a 6-shot opening scene for ">Storyboard</button>
-          <button data-fill="Design key art / a poster for ">Key art</button>
-          <button data-fill="Animate this image into a 4 second clip: ">Animate an image</button>
-          <button data-fill="Make a clean studio product shot of ">Product shot</button>
+        <div class="tool-row" id="toolRow">
+          <button data-go="studio"><span class="ti">▤</span> Edit in Timeline</button>
+          <button data-fill="Make a 4 second cinematic clip of " data-mode="video"><span class="ti ti-video">▶</span> Wan 2.2</button>
+          <button data-fill="Generate an image of " data-mode="image"><span class="ti ti-image">◐</span> FLUX</button>
+          <button data-fill="Create a mood board for "><span class="ti">▦</span> Mood Board</button>
+          <button data-fill="Design a motion graphic for "><span class="ti">✶</span> Motion Graphic</button>
+          <button data-more="1" aria-label="More starters"><span class="ti">☰</span></button>
+          <button data-go="assets"><span class="ti">◫</span> Asset Library <span class="ext">↗</span></button>
+        </div>
+        <div class="explore">
+          <div class="explore-tabs" id="exploreTabs"></div>
+          <div class="explore-strip-wrap">
+            <div class="explore-strip" id="exploreStrip"></div>
+            <button class="strip-next" id="stripNext" type="button" aria-label="More">›</button>
+          </div>
         </div>
       </section>
 
@@ -125,6 +138,29 @@
         </div>
       </section>
 
+      <!-- Asset library -->
+      <section class="library" id="assets" hidden>
+        <aside class="lib-side">
+          <div class="lib-side-head"><b>Characters</b><button class="icon-btn sm" id="newCharacter" type="button" title="New character">+</button></div>
+          <ul class="lib-chars" id="libChars"></ul>
+        </aside>
+        <div class="lib-main">
+          <div class="lib-head" id="libHead"></div>
+          <div class="lib-tools">
+            <div class="seg" id="libKinds">
+              <button data-kind="" class="on">All</button><button data-kind="image">Images</button><button data-kind="document">Documents</button><button data-kind="audio">Audio</button>
+            </div>
+            <input class="lib-search" id="libSearch" placeholder="Search by name" />
+            <span class="grow"></span>
+            <button class="btn fit sm" id="libAssign" type="button" title="Match unassigned assets to characters">Auto-assign</button>
+            <button class="btn btn-primary fit sm" id="libUpload" type="button">Upload</button>
+          </div>
+          <div class="lib-drop" id="libDrop">
+            <div class="lib-grid" id="libGrid"></div>
+          </div>
+        </div>
+      </section>
+
       <section class="page" id="gallery" hidden>
         <div class="page-head"><div><h2>Gallery</h2><p>Every image and clip you have generated.</p></div></div>
         <div class="gallery-grid" id="galleryGrid"></div>
@@ -150,7 +186,7 @@
       <div class="attachments" id="attachments"></div>
       <textarea id="input" rows="1" placeholder="Send a message..."></textarea>
       <div class="composer-bar">
-        <button type="button" class="icon-btn" data-act="attach" title="Add image">+</button>
+        <button type="button" class="icon-btn plus-btn" data-act="plus" title="Add files">+</button>
         <span class="grow"></span>
         <button type="button" class="menu-btn" data-act="model"><span id="modelLabel">Sonnet 5.5</span> <span class="chev">⌄</span></button>
         <button type="button" class="menu-btn" data-act="mode"><span id="modeLabel">Ask <i>•</i> <em>Quality</em></span></button>
@@ -160,7 +196,25 @@
   </template>
 
   <input type="file" id="scriptFile" accept=".txt,.md,.markdown,.fountain,.docx,.pdf,.srt,.vtt,text/plain" hidden />
-  <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp" multiple hidden />
+  <input type="file" id="fileInput" multiple hidden />
+  <input type="file" id="refInput" accept="image/*,.heic,.heif,.avif,.tif,.tiff,.bmp,.svg,.tga,.psd" multiple hidden />
+
+  <!-- Pick assets from the library to attach in chat -->
+  <div class="modal" id="pickerModal" hidden>
+    <div class="modal-card picker">
+      <div class="modal-head"><b>Asset library</b><span class="grow"></span><div class="seg sm" id="pickKinds"><button data-kind="" class="on">All</button><button data-kind="image">Images</button><button data-kind="document">Docs</button><button data-kind="audio">Audio</button></div><button class="icon-btn" data-pick="close">✕</button></div>
+      <select class="pick-char" id="pickChar"></select>
+      <div class="pick-grid" id="pickGrid"></div>
+      <div class="pick-foot"><span class="hint" id="pickCount">Nothing selected</span><span class="grow"></span><button class="btn fit" data-pick="close">Cancel</button><button class="btn btn-primary fit" data-pick="use" disabled>Attach</button></div>
+    </div>
+  </div>
+
+  <!-- One asset: preview, characters, download -->
+  <div class="modal" id="assetModal" hidden>
+    <div class="modal-card asset-card" id="assetCard"></div>
+  </div>
+
+  <div class="drop-veil" id="dropVeil" hidden><div>Drop files to add them<br><small>Images, documents and audio</small></div></div>
 
   <div class="popover" id="popover" hidden></div>
 

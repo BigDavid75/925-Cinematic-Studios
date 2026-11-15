@@ -5,6 +5,34 @@
 - **Script to Film:** upload a script, get one clip per shot on a timeline in script order, stitched into one film you can export.
 - **Agent chat:** describe an idea; a Claude-powered agent proposes image or video generations as approval cards.
 
+## Agent chat
+
+The chat works like the Runway agent flow it was modelled on: type on the home composer (or pick a starter from the tool row or the examples under it), and the page switches to a session at `?sessionId=…&tab=generations`. The agent's reasoning streams live under **Thinking ›**, a **Writing prompt…** placeholder card appears while it drafts, then a **Generate Image / Generate Video** card waits for **Approve** (or ✎ to edit) while the reply keeps going. The session is titled "Untitled session" until the agent names it, and it appears under **Recents** (chats and films, with + and a filter). **Agent** in the sidebar returns to your latest chat.
+
+### Uploads in chat
+
+**+** in the composer → **Upload files** or **From asset library**. You can also drag files onto the page or paste images. Accepted:
+
+- **Images:** PNG, JPEG, WebP, GIF, HEIC/HEIF (iPhone), AVIF, TIFF, BMP, SVG, TGA, PSD, ICO and more. Every image gets a web copy (max 2048 px, EXIF rotation applied) and a thumbnail; the original is kept for download.
+- **Documents:** PDF, Word (.docx and old .doc), OpenDocument (.odt), RTF, plain text, Markdown, Fountain, Final Draft (.fdx), HTML, CSV, JSON, subtitles. Text is extracted; the agent reads small PDFs directly (layout and pictures) and everything else as text.
+- **Audio:** MP3, WAV, M4A/AAC, FLAC, OGG/Opus, AIFF, WMA, AMR, CAF and more. Formats browsers can't play get an M4A copy for listening. The agent can't hear audio; it goes by the file name and what you say ("this is Riley's voice").
+
+Files upload as soon as you pick them (up to 200 MB each, 20 per message) and show progress in the composer.
+
+### Asset library and characters
+
+Everything uploaded lands in the **Assets** page, and is filed under characters automatically:
+
+1. **Documents that list characters** (a series bible, a cast list, a screenplay's speaking parts) create those characters and are filed under them.
+2. **File names** that contain a character's name are filed under that character (`riley_turnaround.png` → Riley).
+3. **Your message:** if it names one character ("the laugh is Riley's"), the files sent with it go to them.
+4. **Scripts and notes** are filed under the characters they mention.
+5. **With `ANTHROPIC_API_KEY` set**, Claude then looks at the images and reads the documents to catch what the rules miss (a character's face in a picture with a generic file name), and the chat agent can fix assignments or add characters with its `assign_assets` and `create_character` tools.
+
+The chat shows an **Asset library** card listing where each file went. On the Assets page you can filter by type, search, drag a file onto a character (or onto **Unassigned**), edit a character's name and description, open a file to preview it (image, document text, audio player), change its characters, download the original, or **Use in chat**. **Auto-assign** re-runs the matcher on unassigned files. Generated images have **Save to asset library** on their card.
+
+The agent gets the character list (names, descriptions, reference image ids) so prompts describe characters the same way every time, and a character's reference image can be the start image of a clip. The Script to Film storyboard writer gets the same descriptions.
+
 ## Script to Film
 
 1. **Script.** Paste a script or upload a file (`.txt`, `.md`, `.fountain`, `.docx`, `.pdf`, `.srt`).
@@ -99,11 +127,13 @@ Two safety rules are built in:
 | `lib/projects.js` | Films: shots, render queue, timeline order, auto-stitch, exports |
 | `lib/video.js` | ffmpeg: stitch clips with their sound (cut or crossfade), encode exports, add sound to clips, mock clips |
 | `lib/engine.js` | Runs jobs, chat image uploads, the sound pass, keeps a local copy of every result, refunds failures |
-| `lib/agent.js` | Claude agent loop: streams thinking/text, turns tool calls into approval cards, keeps thinking blocks intact |
+| `lib/agent.js` | Claude agent loop: streams thinking/text, turns generation tool calls into approval cards, runs the library tools, keeps thinking blocks intact |
+| `lib/assets.js` | Asset library: ingests uploads, converts images and audio, extracts document text, feeds files to the agent |
+| `lib/characters.js` | Characters and automatic filing: name rules, character lists in documents, Claude matching |
 | `lib/tools.js` | Tool schemas, system prompt, credit pricing, engine names |
 | `lib/comfy.js` | Sends workflows to ComfyUI through the tunnel, runs the sound pass, checks the tunnel is locked |
 | `lib/mock.js` | Simulated agent and engine for `npm run mock` |
 | `lib/store.js` | JSON-file storage for sessions, jobs, films and credits (swap for Postgres when you add accounts) |
-| `public/` | The studio UI (vanilla HTML/CSS/JS, no build step); `studio.js` is Script to Film |
+| `public/` | The studio UI (vanilla HTML/CSS/JS, no build step); `studio.js` is Script to Film, `library.js` the asset library, `files.js` uploads |
 | `workflows/` | ComfyUI workflows and the node mapping |
 | `test/` | Parser tests (`npm test`) |
