@@ -33,7 +33,7 @@ The tunnel and its Access lock only work for a domain whose DNS is on Cloudflare
 ## 2. Deploy the web app on Render
 
 1. Sign in at render.com and connect GitHub, allowing access to **925-Cinematic-Studios**.
-2. **New → Blueprint** → pick `925-Cinematic-Studios`. Render reads `render.yaml`: a Docker web service named `openartvision`, a 10GB disk at `/app/data`, the health check and the custom domain `www.925cinema.com`.
+2. **New → Blueprint** → pick `925-Cinematic-Studios`. Render reads `render.yaml`: a Docker web service named `925cinema` (its address is `openartvision.onrender.com`), a 10GB disk at `/app/data`, the health check and the custom domain `www.925cinema.com`.
 3. Fill in the secrets it asks for:
    - `ANTHROPIC_API_KEY`: your Claude API key.
    - `SITE_PASSWORD`: the password visitors type to get in. **Required.** The server will not start without it, or with `change-me`.
@@ -43,7 +43,7 @@ The tunnel and its Access lock only work for a domain whose DNS is on Cloudflare
 
 ## 3. Point www.925cinema.com at Render
 
-In Render → the `openartvision` service → **Settings → Custom Domains**, `www.925cinema.com` is listed with the DNS target to use. In Cloudflare → **DNS → Records**, add:
+In Render → the `925cinema` service → **Settings → Custom Domains**, `www.925cinema.com` is listed with the DNS target to use. In Cloudflare → **DNS → Records**, add:
 
 | Type | Name | Target | Proxy status |
 | --- | --- | --- | --- |
@@ -78,7 +78,7 @@ Then lock it, **before** starting the tunnel:
 
 1. Cloudflare dashboard → **Zero Trust → Access → Service auth → Create service token**. Copy the Client ID and Client Secret (the secret is shown once).
 2. **Zero Trust → Access → Applications → Add → Self-hosted**: domain `comfy.925cinema.com`. Add a policy with action **Service Auth** that includes that service token. Add no other policies.
-3. In Render → `openartvision` → **Environment**, set `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET`. `COMFY_URL` is already `https://comfy.925cinema.com`.
+3. In Render → `925cinema` → **Environment**, set `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET`. `COMFY_URL` is already `https://comfy.925cinema.com`.
 
 Now start the tunnel:
 

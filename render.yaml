@@ -3,7 +3,7 @@
 services:
   - type: web
     # Must match the existing Render service; renaming it here makes the Blueprint try to create a second service.
-    name: openartvision
+    name: 925cinema
     runtime: docker
     plan: starter
     healthCheckPath: /healthz
